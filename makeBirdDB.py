@@ -7,25 +7,24 @@ DB_NAME = 'tree_of_life'
 DB_SOURCE = 'clements.csv'
 
 TABLES = {}
-TABLES['birds'] = (
-    "CREATE TABLE 'birds' ("
-    "  'id' int UNSIGNED NOT NULL,"
-    "  'category' varchar(20) NOT NULL,"
-    "  'genus' varchar(40) NOT NULL,"
-    "  'species' varchar(40) NOT NULL,"
-    "  'subspecies' varchar(40),"
-    "  'group' varchar(40),"
-    "  'english_name' varchar(50),"
-    "  'range' varchar(200),"
-    "  'order' varchar(40) NOT NULL,"
-    "  'family' varchar(40) NOT NULL,"
-    "  'family' varchar(40),"
-    "  'extinct' enum('True', 'False') NOT NULL,"
-    "  'extinct_date' year,"
-    "  PRIMARY KEY ('id')"
-    ") ENGINE=InnoDB")
+TABLES["birds"] = \
+    """CREATE TABLE birds (
+    id int UNSIGNED NOT NULL,
+    category varchar(50) NOT NULL,
+    genus varchar(50) NOT NULL,
+    species varchar(50) NOT NULL,
+    subspecies varchar(50),
+    spec_group varchar(50),
+    english_name varchar(100),
+    geo_range varchar(500),
+    taxon_order varchar(50) NOT NULL,
+    family varchar(50) NOT NULL,
+    family_desc varchar(50),
+    extinct enum('True', 'False') NOT NULL,
+    extinct_date varchar(25),
+    PRIMARY KEY (id)
+    ) """
 
-print(TABLES['birds'])
 
 config = {
     'user': 'root',
@@ -73,6 +72,7 @@ for name, ddl in TABLES.iteritems():
         if err.errno == errorcode.ER_TABLE_EXISTS_ERROR:
             print("already exists")
         else:
+            print("Failed to create table: : ", name)
             print(err.msg)
     else:
         print("OK")
@@ -88,8 +88,8 @@ def processLine(line):
     record['genus'] = genus
     spec = sci[1]
     record['spec'] = spec
-    record['sub'] = None
-    record['group'] = None
+    record['sub'] = 'NULL'
+    record['group'] = 'NULL'
     if cat in ['subspecies', 'group (monotypic)']:
         record['sub'] = sci[2]
     elif cat in ['group (polytypic)']:
@@ -101,8 +101,13 @@ def processLine(line):
     family = fam[0]
     record['family'] = family
     record['fam_desc'] = fields[8][len(family)+2:-1]
+    if not record['fam_desc']:
+        record['fam_desc'] = 'NULL'
     record['ext'] = fields[9]
-    record['ext_date'] = fields[10]
+    if fields[10]:
+        record['ext_date'] = fields[10]
+    else:
+        record['ext_date'] = None
     return record
 
 def processCSVFile(f1, cursor):
@@ -116,19 +121,15 @@ def processCSVFile(f1, cursor):
 def addRecord(record, cursor):
     print(record['eng'])
     addBird = ("INSERT INTO birds "
-               "(id) "
-               "VALUES (%s)")
-               #           "(id, category, genus, species, subspecies, english_name, range, order, family, family_desc, extinct, extinct_date) "
-               #           "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)")
+               "(id, category, genus, species, subspecies, spec_group, english_name, "
+               "geo_range, taxon_order, family, family_desc, extinct, extinct_date) "
+               "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""")
     extinct = 'False'
-    if extinct == 1:
+    if record['ext'] == '1':
         print(record['eng'], "is extinct")
         extinct = "True"
-    birdData = (record['id'])
-    #birdData = (record['id'], record['cat'], record['genus'], record['spec'], record['sub'], record['eng'], \
-    #            record['rang'], record['order'], record['family'], record['fam_desc'], extinct, record['ext_date'])
-    
-    print(addBird)
+    birdData = (record['id'], record['cat'], record['genus'], record['spec'], record['sub'], record['group'], record['eng'], \
+                record['rang'], record['order'], record['family'], record['fam_desc'], extinct, record['ext_date'])
     print(birdData)
     cursor.execute(addBird, birdData)
 
