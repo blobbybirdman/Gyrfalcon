@@ -119,7 +119,6 @@ def processCSVFile(f1, cursor):
         addRecord(record, cursor)
 
 def addRecord(record, cursor):
-    print(record['eng'])
     addBird = ("INSERT INTO birds "
                "(id, category, genus, species, subspecies, spec_group, english_name, "
                "geo_range, taxon_order, family, family_desc, extinct, extinct_date) "

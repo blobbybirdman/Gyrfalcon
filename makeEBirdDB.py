@@ -1,5 +1,6 @@
 from __future__ import print_function
 
+from datetime import date, time
 import mysql.connector
 from mysql.connector import errorcode
 
@@ -8,7 +9,7 @@ DB_SOURCE = 'MyEbirdData.csv'
 
 TABLES = {}
 TABLES["bird_sightings"] = \
-    """CREATE TABLE birds (
+    """CREATE TABLE ebird (
     id varchar(20) NOT NULL,
     common_name varchar(100) NOT NULL,
     genus varchar(50) NOT NULL,
@@ -28,8 +29,8 @@ TABLES["bird_sightings"] = \
     distance int unsigned,
     area int unsigned, 
     num_obs int unsigned,
-    breeding_code
-    PRIMARY KEY (id)
+    breeding_code varchar(20),
+    PRIMARY KEY (id, genus, species)
     ) """
 
 
@@ -85,36 +86,47 @@ for name, ddl in TABLES.iteritems():
         print("OK")
 
 def processLine(line):
+    print(line)
     record = {}
-    fields = line.split(':')
+    fields = line.split(',')
     record['id'] = fields[0]
-    cat = fields[3][1:-1]
-    record['cat'] = cat
-    sci = fields[4][1:-1].split()
-    genus = sci[0]    
-    record['genus'] = genus
-    spec = sci[1]
-    record['spec'] = spec
+    record['common'] = fields[1]
+    sci = fields[2].split()
+    record['genus'] = sci[0]
+    record['species'] = sci[1]
     record['sub'] = 'NULL'
-    record['group'] = 'NULL'
-    if cat in ['subspecies', 'group (monotypic)']:
+    if len(sci) > 2:
         record['sub'] = sci[2]
-    elif cat in ['group (polytypic)']:
-        record['group'] = fields[4][len(genus)+len(spec)+4:-2]
-    record['eng'] = fields[5][1:-1]
-    record['rang'] = fields[6][1:-1]
-    record['order'] = fields[7][1:-1]
-    fam = fields[8][1:-1].split()
-    family = fam[0]
-    record['family'] = family
-    record['fam_desc'] = fields[8][len(family)+2:-1]
-    if not record['fam_desc']:
-        record['fam_desc'] = 'NULL'
-    record['ext'] = fields[9]
-    if fields[10]:
-        record['ext_date'] = fields[10]
-    else:
-        record['ext_date'] = None
+    record['order'] = fields[3]
+    record['count'] = fields[4]
+    record['state'] = fields[5]
+    record['county'] = fields[6]
+    record['location'] = fields[7]
+    record['latitude'] = fields[8]
+    record['longitude'] = fields[9]
+    record['date'] = fields[10]
+    record['time'] = fields[11]
+    record['protocol'] = fields[12]
+    record['duration'] = None
+    if len(fields) > 13:
+        if fields[13]:
+            record['duration'] = fields[13]
+    record['distance'] = None
+    if len(fields) > 14:
+        if fields[14]:
+            record['distance'] = fields[14]
+    record['area'] = None
+    if len(fields) > 15:
+        if fields[15]:
+            record['area'] = fields[15]
+    record['num_obs'] = None
+    if len(fields) > 16:
+        if fields[16]:
+            record['num_obs'] = fields[16]
+    record['breeding_code'] = None
+    if len(fields) > 17:
+        if fields[17]:
+            record['breeding_code'] = fields[17]
     return record
 
 def processCSVFile(f1, cursor):
@@ -122,23 +134,34 @@ def processCSVFile(f1, cursor):
     csv.readline()[:5]
     
     for line in csv.readlines():
-        record = processLine(line)
+        record = processLine(line[:-1])
         addRecord(record, cursor)
 
 def addRecord(record, cursor):
-    print(record['eng'])
-    addBird = ("INSERT INTO birds "
-               "(id, category, genus, species, subspecies, spec_group, english_name, "
-               "geo_range, taxon_order, family, family_desc, extinct, extinct_date) "
-               "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""")
-    extinct = 'False'
-    if record['ext'] == '1':
-        print(record['eng'], "is extinct")
-        extinct = "True"
-    birdData = (record['id'], record['cat'], record['genus'], record['spec'], record['sub'], record['group'], record['eng'], \
-                record['rang'], record['order'], record['family'], record['fam_desc'], extinct, record['ext_date'])
-    print(birdData)
-    cursor.execute(addBird, birdData)
+    print(record['common'])
+    addrecord = ("INSERT INTO ebird "
+               "(id, common_name, genus, species, subspecies, taxon_order, count, "
+               "state, county, location, latitude, longitude, date, time, protocol, "
+               "duration, distance, area, num_obs, breeding_code) "
+               "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)")
+    date_fields = record['date'].split('-')
+    year = int(date_fields[2])
+    month = int(date_fields[0])
+    day = int(date_fields[1])
+    obs_time = None
+    if record['time']:
+        time_fields = record['time'].split()
+        hours, mins = time_fields[0].split(':')
+        hours = int(hours)
+        mins = int(mins)
+        if time_fields[1] == 'PM':
+            hours =+ 12
+        time(hours, mins)
+    data = (record['id'], record['common'], record['genus'], record['species'], record['sub'], record['order'], record['count'], record['state'], \
+                record['county'], record['location'], record['latitude'], record['longitude'], date(year, month, day), obs_time, record['protocol'], \
+                record['duration'], record['distance'], record['area'], record['num_obs'], record['breeding_code'])
+    print(data)
+    cursor.execute(addrecord, data)
 
 processCSVFile(DB_SOURCE, cursor)
 
