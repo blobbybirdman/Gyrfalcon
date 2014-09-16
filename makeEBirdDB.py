@@ -1,8 +1,9 @@
 from __future__ import print_function
-
-from datetime import date, time
+import datetime
+from datetime import date
 import mysql.connector
 from mysql.connector import errorcode
+import csv
 
 DB_NAME = 'tree_of_life'
 DB_SOURCE = 'MyEbirdData.csv'
@@ -30,7 +31,7 @@ TABLES["bird_sightings"] = \
     area int unsigned, 
     num_obs int unsigned,
     breeding_code varchar(20),
-    PRIMARY KEY (id, genus, species)
+    PRIMARY KEY (id, genus, species, subspecies)
     ) """
 
 
@@ -85,10 +86,11 @@ for name, ddl in TABLES.iteritems():
     else:
         print("OK")
 
-def processLine(line):
-    print(line)
+def processLine(fields):
+    print(fields)
     record = {}
-    fields = line.split(',')
+    
+    #fields = line.split(',')
     record['id'] = fields[0]
     record['common'] = fields[1]
     sci = fields[2].split()
@@ -130,12 +132,17 @@ def processLine(line):
     return record
 
 def processCSVFile(f1, cursor):
-    csv = open(f1, 'r')
-    csv.readline()[:5]
-    
-    for line in csv.readlines():
-        record = processLine(line[:-1])
+    csvFile = open(f1, 'r')
+    csvFile.readline()[:5]
+
+    reader = csv.reader(csvFile, delimiter=',', quotechar='"')
+    for row in reader:
+        record = processLine(row)
         addRecord(record, cursor)
+    
+    #for line in csv.readlines():
+    #    record = processLine(line[:-1])
+    #    addRecord(record, cursor)
 
 def addRecord(record, cursor):
     print(record['common'])
@@ -154,9 +161,9 @@ def addRecord(record, cursor):
         hours, mins = time_fields[0].split(':')
         hours = int(hours)
         mins = int(mins)
-        if time_fields[1] == 'PM':
-            hours =+ 12
-        time(hours, mins)
+        if time_fields[1] == 'PM' and hours < 12:
+            hours += 12
+        obs_time = datetime.time(hours, mins)
     data = (record['id'], record['common'], record['genus'], record['species'], record['sub'], record['order'], record['count'], record['state'], \
                 record['county'], record['location'], record['latitude'], record['longitude'], date(year, month, day), obs_time, record['protocol'], \
                 record['duration'], record['distance'], record['area'], record['num_obs'], record['breeding_code'])
